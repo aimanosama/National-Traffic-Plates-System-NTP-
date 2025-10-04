@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة تحكم الإدارة - نظام البلاغات المرورية</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1E88E5, #0D47A1);
+            color: white;
+            padding: 20px 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 0 0 15px 15px;
+            margin-bottom: 30px;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .stats {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            flex: 1;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1E88E5;
+        }
+
+        .filters {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        select, input, button {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        button {
+            background: #1E88E5;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #1565C0;
+        }
+
+        .reports-table {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: right;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #1E88E5;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+
+        .status-rejected {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+
+        .status-contact {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+
+        .action-cell {
+            display: flex;
+            gap: 10px;
+        }
+
+        .response-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-top: 5px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        .close {
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .close:hover {
+            color: #333;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .no-reports {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .stats {
+                flex-direction: column;
+            }
+            
+            .filters {
+                flex-direction: column;
+            }
+            
+            table {
+                display: block;
+                overflow-x: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <h1>لوحة تحكم الإدارة - نظام البلاغات المرورية</h1>
+                <div id="last-update">آخر تحديث: <span id="update-time">--:--</span></div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="total-reports">0</div>
+                <div>إجمالي البلاغات</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="pending-reports">0</div>
+                <div>قيد المراجعة</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="rejected-reports">0</div>
+                <div>مرفوض</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="contact-reports">0</div>
+                <div>سيتم التواصل</div>
+            </div>
+        </div>
+
+        <div class="filters">
+            <div class="filter-group">
+                <label for="status-filter">تصفية حسب الحالة:</label>
+                <select id="status-filter">
+                    <option value="all">الكل</option>
+                    <option value="قيد المراجعة">قيد المراجعة</option>
+                    <option value="مرفوض">مرفوض</option>
+                    <option value="سيتم التواصل">سيتم التواصل</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="type-filter">تصفية حسب النوع:</label>
+                <select id="type-filter">
+                    <option value="all">الكل</option>
+                    <option value="السرعة الزائدة">السرعة الزائدة</option>
+                    <option value="إعاقة المرور">إعاقة المرور</option>
+                    <option value="تحرش">تحرش</option>
+                    <option value="سرقة">سرقة</option>
+                    <option value="أخرى">أخرى</option>
+                </select>
+            </div>
+            <button id="refresh-btn">تحديث البيانات</button>
+            <button id="export-btn">تصدير البيانات</button>
+        </div>
+
+        <div class="reports-table">
+            <div id="table-container">
+                <div class="loading" id="loading-message">جاري تحميل البلاغات...</div>
+                <table id="reports-table" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th>رقم البلاغ</th>
+                            <th>النوع</th>
+                            <th>رقم السيارة</th>
+                            <th>الصورة</th>
+                            <th>التفاصيل</th>
+                            <th>الحالة</th>
+                            <th>التاريخ</th>
+                            <th>رد الإدارة</th>
+                            <th>الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reports-body">
+                        <!-- سيتم ملؤها بالبيانات -->
+                    </tbody>
+                </table>
+                <div class="no-reports" id="no-reports-message" style="display: none;">
+                    لا توجد بلاغات لعرضها
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for editing report -->
+    <div class="modal" id="edit-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>تعديل البلاغ</h2>
+                <span class="close" id="close-modal">&times;</span>
+            </div>
+            <div id="modal-body">
+                <div class="form-group">
+                    <label for="edit-status">الحالة:</label>
+                    <select id="edit-status">
+                        <option value="قيد المراجعة">قيد المراجعة</option>
+                        <option value="مرفوض">مرفوض</option>
+                        <option value="سيتم التواصل">سيتم التواصل</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="edit-response">رد الإدارة:</label>
+                    <textarea id="edit-response" rows="4" placeholder="اكتب رد الإدارة هنا..."></textarea>
+                </div>
+                <div style="margin-top: 15px; text-align: left;">
+                    <button id="save-changes">حفظ التغييرات</button>
+                    <button id="cancel-edit" style="background: #6c757d;">إلغاء</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API configuration
+        const API_BASE_URL = 'http://127.0.0.1:8000';
+        let allReports = [];
+        let currentEditingReportId = null;
+
+        // DOM elements
+        const reportsBody = document.getElementById('reports-body');
+        const loadingMessage = document.getElementById('loading-message');
+        const noReportsMessage = document.getElementById('no-reports-message');
+        const reportsTable = document.getElementById('reports-table');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const statusFilter = document.getElementById('status-filter');
+        const typeFilter = document.getElementById('type-filter');
+        const editModal = document.getElementById('edit-modal');
+        const closeModal = document.getElementById('close-modal');
+        const cancelEdit = document.getElementById('cancel-edit');
+        const saveChanges = document.getElementById('save-changes');
+        const editStatus = document.getElementById('edit-status');
+        const editResponse = document.getElementById('edit-response');
+        const exportBtn = document.getElementById('export-btn');
+
+        // Update statistics
+        function updateStats() {
+            const total = allReports.length;
+            const pending = allReports.filter(r => r.status === 'قيد المراجعة').length;
+            const rejected = allReports.filter(r => r.status === 'مرفوض').length;
+            const contact = allReports.filter(r => r.status === 'سيتم التواصل').length;
+
+            document.getElementById('total-reports').textContent = total;
+            document.getElementById('pending-reports').textContent = pending;
+            document.getElementById('rejected-reports').textContent = rejected;
+            document.getElementById('contact-reports').textContent = contact;
+        }
+
+        // Format date
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('ar-EG') + ' ' + date.toLocaleTimeString('ar-EG');
+        }
+
+        // Get status class
+        function getStatusClass(status) {
+            switch(status) {
+                case 'قيد المراجعة': return 'status-pending';
+                case 'مرفوض': return 'status-rejected';
+                case 'سيتم التواصل': return 'status-contact';
+                default: return '';
+            }
+        }
+
+        // Fetch all reports from API
+        async function fetchReports() {
+            try {
+                loadingMessage.style.display = 'block';
+                noReportsMessage.style.display = 'none';
+                reportsTable.style.display = 'none';
+
+                const response = await fetch(`${API_BASE_URL}/api/v2/admin/reports`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                allReports = await response.json();
+                displayReports(allReports);
+                updateStats();
+                
+                // Update last update time
+                document.getElementById('update-time').textContent = new Date().toLocaleTimeString('ar-EG');
+            } catch (error) {
+                console.error('Error fetching reports:', error);
+                loadingMessage.style.display = 'none';
+                noReportsMessage.style.display = 'block';
+                noReportsMessage.textContent = 'حدث خطأ في جلب البيانات: ' + error.message;
+            }
+        }
+
+        // Display reports in the table
+        function displayReports(reports) {
+            reportsBody.innerHTML = '';
+            
+            if (reports.length === 0) {
+                loadingMessage.style.display = 'none';
+                noReportsMessage.style.display = 'block';
+                reportsTable.style.display = 'none';
+                return;
+            }
+            
+            reports.forEach(report => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${report.id.substring(0, 8)}...</td>
+                    <td>${report.type}</td>
+                    <td>${report.car_number}</td>
+                    <td>${report.image_name || 'لا يوجد'}</td>
+                    <td>${report.details}</td>
+                    <td><span class="${getStatusClass(report.status)}">${report.status}</span></td>
+                    <td>${formatDate(report.date)}</td>
+                    <td>${report.admin_response || 'لا يوجد'}</td>
+                    <td class="action-cell">
+                        <button class="edit-btn" data-id="${report.id}">تعديل</button>
+                    </td>
+                `;
+                reportsBody.appendChild(row);
+            });
+            
+            loadingMessage.style.display = 'none';
+            noReportsMessage.style.display = 'none';
+            reportsTable.style.display = 'table';
+            
+            // Add event listeners to edit buttons
+            document.querySelectorAll('.edit-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const reportId = this.getAttribute('data-id');
+                    openEditModal(reportId);
+                });
+            });
+        }
+
+        // Open edit modal
+        function openEditModal(reportId) {
+            const report = allReports.find(r => r.id === reportId);
+            if (!report) return;
+            
+            currentEditingReportId = reportId;
+            editStatus.value = report.status;
+            editResponse.value = report.admin_response || '';
+            editModal.style.display = 'flex';
+        }
+
+        // Close edit modal
+        function closeEditModal() {
+            editModal.style.display = 'none';
+            currentEditingReportId = null;
+        }
+
+        // Save changes to report
+        async function saveReportChanges() {
+            if (!currentEditingReportId) return;
+            
+            const report = allReports.find(r => r.id === currentEditingReportId);
+            if (!report) return;
+            
+            const newStatus = editStatus.value;
+            const newResponse = editResponse.value;
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/v2/reports/${currentEditingReportId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        status: newStatus,
+                        admin_response: newResponse
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                // Update local data
+                report.status = newStatus;
+                report.admin_response = newResponse;
+                
+                // Refresh display
+                displayReports(allReports);
+                updateStats();
+                
+                closeEditModal();
+                alert('تم حفظ التغييرات بنجاح!');
+            } catch (error) {
+                console.error('Error updating report:', error);
+                alert('حدث خطأ في حفظ التغييرات: ' + error.message);
+            }
+        }
+
+        // Filter reports
+        function filterReports() {
+            const statusValue = statusFilter.value;
+            const typeValue = typeFilter.value;
+            
+            let filteredReports = allReports;
+            
+            if (statusValue !== 'all') {
+                filteredReports = filteredReports.filter(r => r.status === statusValue);
+            }
+            
+            if (typeValue !== 'all') {
+                filteredReports = filteredReports.filter(r => r.type === typeValue);
+            }
+            
+            displayReports(filteredReports);
+        }
+
+        // Export data to CSV
+        function exportToCSV() {
+            if (allReports.length === 0) {
+                alert('لا توجد بيانات للتصدير');
+                return;
+            }
+            
+            const headers = ['رقم البلاغ', 'النوع', 'رقم السيارة', 'الصورة', 'التفاصيل', 'الحالة', 'التاريخ', 'رد الإدارة'];
+            const csvContent = [
+                headers.join(','),
+                ...allReports.map(report => [
+                    report.id,
+                    report.type,
+                    report.car_number,
+                    report.image_name || '',
+                    `"${report.details.replace(/"/g, '""')}"`,
+                    report.status,
+                    report.date,
+                    `"${(report.admin_response || '').replace(/"/g, '""')}"`
+                ].join(','))
+            ].join('\n');
+            
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `reports_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Event listeners
+        refreshBtn.addEventListener('click', fetchReports);
+        statusFilter.addEventListener('change', filterReports);
+        typeFilter.addEventListener('change', filterReports);
+        closeModal.addEventListener('click', closeEditModal);
+        cancelEdit.addEventListener('click', closeEditModal);
+        saveChanges.addEventListener('click', saveReportChanges);
+        exportBtn.addEventListener('click', exportToCSV);
+
+        // Close modal when clicking outside
+        window.addEventListener('click', (event) => {
+            if (event.target === editModal) {
+                closeEditModal();
+            }
+        });
+
+        // Initial load
+        fetchReports();
+    </script>
+</body>
+</html>
