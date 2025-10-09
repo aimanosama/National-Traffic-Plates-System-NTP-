@@ -1,10 +1,12 @@
-from fastapi import FastAPI, HTTPException, Depends, status, Header
+from fastapi import FastAPI, HTTPException, Depends, status, Header, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 import uuid
+import os
+import base64
 
 app = FastAPI(title="نظام البلاغات المرورية", version="1.0.0")
 
@@ -16,7 +18,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 class UserSignup(BaseModel):
     first_name: str
@@ -53,13 +54,40 @@ class ReportUpdate(BaseModel):
     admin_response: Optional[str] = None
 
 
+class PlateRecognitionResponse(BaseModel):
+    success: bool
+    car_number: Optional[str] = None
+    error: Optional[str] = None
+
+
+class PlateRecognitionBase64(BaseModel):
+    image: str
+    filename: str
+
+
 # قاعدة بيانات مؤقتة
 users_db = {}
 reports_db = {}
 tokens_db = {}
 
+arabic = {
+    "alif": "أ", "alef": "ا", "hamza": "ء", "hamza_on_alif": "أ",
+    "hamza_under_alif": "إ", "hamza_on_waaw": "ؤ", "hamza_on_yaa": "ئ",
+    "baa": "ب", "daal": "د", "dal": "د", "zal": "ذ", "zay": "ز",
+    "aain": "ع", "ghain": "غ", "faa": "ف", "geem": "ج", "jeem": "ج",
+    "haa": "ھ", "ha": "ح", "kaaf": "ك", "kaf": "ك", "laam": "ل",
+    "meem": "م", "noon": "ن", "qaf": "ق", "raa": "ر", "ra": "ر",
+    "sad": "ص", "dad": "ض", "seen": "س", "sheen": "ش", "taa": "ت",
+    "taa_marbuta": "ة", "taa2": "ط", "waaw": "و", "yaa": "ي",
+    "0": "٠", "1": "١", "2": "٢", "3": "٣", "4": "٤",
+    "5": "٥", "6": "٦", "7": "٧", "8": "٨", "9": "٩"
+}
 
-# دوال المساعدة
+# تحميل النموذج
+from ultralytics import YOLO
+MODEL_LOADED = True
+model = YOLO("NTP_V1.pt")
+
 def generate_token():
     return str(uuid.uuid4())
 
@@ -90,17 +118,74 @@ def get_current_user(authorization: str = Header(None)):
             )
 
         user = users_db.get(phone)
-        if not user:
+        if user:
+            return user
+        else:
             raise HTTPException(
                 status_code=401,
                 detail="المستخدم غير موجود"
             )
-
-        return user
     except Exception as e:
         raise HTTPException(
             status_code=401,
             detail=f"توكن غير صالح: {str(e)}"
+        )
+
+
+# دالة للتعرف على لوحة السيارة باستخدام base64
+async def recognize_license_plate_base64(image_data: bytes) -> PlateRecognitionResponse:
+    try:
+        # حفظ الصورة مؤقتاً
+        temp_image_path = f"temp_{uuid.uuid4().hex}.jpg"
+        with open(temp_image_path, "wb") as f:
+            f.write(image_data)
+
+        try:
+            results = model.predict(temp_image_path)
+
+            items = []
+            for box in results[0].boxes:
+                class_id = int(box.cls[0])
+                name = results[0].names[class_id]
+                if name in arabic:
+                    x1, y1, x2, y2 = box.xyxy[0]
+                    center = (x1 + x2) / 2
+                    items.append((center, arabic[name]))
+
+            # ترتيب الأحرف بناءً على موقعها
+            if items:
+                items.sort(key=lambda x: x[0])
+
+                # فصل كل حرف بمسافة
+                characters = [ch for _, ch in items]
+                text = " ".join(characters)
+
+                print(f"✅ تم التعرف على النص: {text}")
+            else:
+                text = "لم يتم التعرف على أي نص"
+                print("⚠️ لم يتم التعرف على أي نص في الصورة")
+
+            return PlateRecognitionResponse(
+                success=True,
+                car_number=text
+            )
+
+        except Exception as e:
+            print(f" خطأ في معالجة الصورة: {e}")
+            return PlateRecognitionResponse(
+                success=False,
+                error=f"خطأ في معالجة الصورة: {str(e)}"
+            )
+        finally:
+            # تنظيف الملف المؤقت
+            if os.path.exists(temp_image_path):
+                os.remove(temp_image_path)
+
+    except Exception as e:
+        print(f" خطأ في قراءة الصورة: {e}")
+        return PlateRecognitionResponse(
+            success=False,
+            error=f"خطأ في قراءة الصورة: {str(e)}"
         )
 
 
@@ -221,6 +306,56 @@ async def verify_token(current_user: dict = Depends(get_current_user)):
     }
 
 
+# endpoint للتعرف على لوحة السيارة
+@app.post("/api/v2/recognize-plate", response_model=PlateRecognitionResponse)
+async def recognize_plate(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    # التحقق من نوع الملف
+    if not file.content_type.startswith('image/'):
+        raise HTTPException(
+            status_code=400,
+            detail="الملف يجب أن يكون صورة"
+        )
+
+    try:
+        # قراءة بيانات الصورة
+        image_data = await file.read()
+
+        if len(image_data) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="الصورة فارغة"
+            )
+
+        # التعرف على لوحة السيارة باستخدام النسخة الذكية
+        result = await recognize_license_plate_base64(image_data)
+        return result
+
+    except Exception as e:
+        return PlateRecognitionResponse(
+            success=False,
+            error=f"خطأ في معالجة الصورة: {str(e)}"
+        )
+
+
+# endpoint للتعرف على لوحة السيارة باستخدام base64
+@app.post("/api/v2/recognize-plate-base64", response_model=PlateRecognitionResponse)
+async def recognize_plate_base64(request: PlateRecognitionBase64, current_user: dict = Depends(get_current_user)):
+    try:
+        # فك تشفير base64
+        image_data = base64.b64decode(request.image)
+
+        # التعرف على لوحة السيارة باستخدام النسخة الذكية
+        result = await recognize_license_plate_base64(image_data)
+        return result
+
+    except Exception as e:
+        return PlateRecognitionResponse(
+            success=False,
+            error=f"خطأ في معالجة الصورة: {str(e)}"
+        )
+
+
+# Health check endpoint
 @app.get("/")
 async def root():
     return {"message": "نظام البلاغات المرورية يعمل بنجاح"}
@@ -228,13 +363,20 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.now()}
+    model_status = "loaded" if MODEL_LOADED else "not loaded"
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now(),
+        "model_status": model_status,
+        "total_users": len(users_db),
+        "total_reports": len(reports_db)
+    }
 
 
 # endpoint to serve the admin page
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page():
-    with open(r"Admin Page\admin.html", "r", encoding="utf-8") as f:
+    with open("admin.html", "r", encoding="utf-8") as f:
         return f.read()
 
 
@@ -245,6 +387,7 @@ async def get_all_reports():
     return sorted(all_reports, key=lambda x: x["date"], reverse=True)
 
 
+# Run the application correctly
 if __name__ == "__main__":
     import uvicorn
 
